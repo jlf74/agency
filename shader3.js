@@ -17,20 +17,32 @@ document.addEventListener('DOMContentLoaded', function () {
     return;
   }
 
-  function resizeCanvas() {
-    var dpr = window.devicePixelRatio || 1;
-    var displayWidth  = Math.round(canvas.clientWidth  * dpr);
-    var displayHeight = Math.round(canvas.clientHeight * dpr);
+  var isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
+  navigator.userAgent
+);
 
-    if (canvas.width !== displayWidth || canvas.height !== displayHeight) {
-      canvas.width = displayWidth;
-      canvas.height = displayHeight;
-      gl.viewport(0, 0, displayWidth, displayHeight);
-      console.log('shader2.js: resized to', displayWidth, displayHeight);
-    }
+function resizeCanvas() {
+  var dpr = window.devicePixelRatio || 1;
+
+  // Ограничиваем плотность пикселей:
+  // на мобильных — поменьше, на десктопе — не выше 1.5
+  if (isMobile) {
+    dpr = Math.min(dpr, 0.75); // можно поставить 0.5, если всё ещё тяжело
+  } else {
+    dpr = Math.min(dpr, 1.5);
   }
 
-  window.addEventListener('resize', resizeCanvas);
+  var displayWidth  = Math.round(canvas.clientWidth  * dpr);
+  var displayHeight = Math.round(canvas.clientHeight * dpr);
+
+  if (canvas.width !== displayWidth || canvas.height !== displayHeight) {
+    canvas.width = displayWidth;
+    canvas.height = displayHeight;
+    gl.viewport(0, 0, displayWidth, displayHeight);
+  }
+}
+
+    window.addEventListener('resize', resizeCanvas);
   resizeCanvas();
 
   var vertexShaderSource = `
