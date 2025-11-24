@@ -64,6 +64,7 @@ document.addEventListener('DOMContentLoaded', function () {
     {
       // нормализованные координаты
       vec2 uv = (2.0 * fragCoord - iResolution.xy) / iResolution.y;
+      uv.x=-uv.x;
 
       vec3 color = vec3(0.0);
 
