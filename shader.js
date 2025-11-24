@@ -1,14 +1,21 @@
-(function () {
-  var canvas = document.getElementById('shader-canvas');
-  if (!canvas) return;
+document.addEventListener('DOMContentLoaded', function () {
+  console.log('shader.js: DOMContentLoaded');
 
-  var gl = canvas.getContext('webgl');
-  if (!gl) {
-    console.warn('WebGL не поддерживается');
+  var canvas = document.getElementById('shader-canvas');
+  console.log('shader.js: canvas =', canvas);
+
+  if (!canvas) {
+    console.warn('shader.js: canvas not found, exiting');
     return;
   }
 
-  // Подгоняем WebGL под CSS-размеры
+  var gl = canvas.getContext('webgl');
+  console.log('shader.js: gl =', gl);
+  if (!gl) {
+    console.warn('WebGL is not supported');
+    return;
+  }
+
   function resizeCanvas() {
     var dpr = window.devicePixelRatio || 1;
     var displayWidth  = Math.round(canvas.clientWidth  * dpr);
@@ -18,13 +25,13 @@
       canvas.width = displayWidth;
       canvas.height = displayHeight;
       gl.viewport(0, 0, displayWidth, displayHeight);
+      console.log('shader.js: resized to', displayWidth, displayHeight);
     }
   }
 
   window.addEventListener('resize', resizeCanvas);
   resizeCanvas();
 
-  // Вершинный шейдер — фуллскрин-квад
   var vertexShaderSource = `
     attribute vec2 aPosition;
     void main() {
@@ -32,7 +39,6 @@
     }
   `;
 
-  // Функция tanh для WebGL1
   var fragmentShaderSource = `
     precision highp float;
 
@@ -65,11 +71,7 @@
 
       float r = 200.0;
       vec3 rd = normalize(vec3(uv, -focal));
-      vec3 ro = vec3(
-        cos(pos/r) * r,
-        3.0 + sin(0.1 * pos),
-        sin(pos/r) * r
-      );
+      vec3 ro = vec3( cos(pos/r)*r, 3.0 + sin(0.1*pos), sin(pos/r)*r );
 
       rd.xy *= R(0.3 * sin(0.1 * iTime) + 0.4);
       rd.xz *= R(pos / r);
@@ -111,10 +113,9 @@
                       0.1 * (t + 1.5 * iTime) +
                       length(p - ro) * 0.1;
 
-        vec3 cmap =
-          (1.0 + -cos(phase + vec3(1.0, 2.0, 3.0))) *
-          exp2(2.65 * myTanh(q.y * 0.55) - 1.55) *
-          exp2(-0.01 * t);
+        vec3 cmap = (1.0 + -cos(phase + vec3(1.0, 2.0, 3.0)))
+                    * exp2(2.65 * myTanh(q.y * 0.55) - 1.55)
+                    * exp2(-0.01 * t);
 
         color += cmap * dt / (sdf * sdf + 1.0);
 
@@ -138,9 +139,8 @@
     var shader = gl.createShader(type);
     gl.shaderSource(shader, source);
     gl.compileShader(shader);
-
-    if (!gl.getShaderParameter(shader, gl. COMPILE_STATUS)) {
-      console.error('Ошибка компиляции:', gl.getShaderInfoLog(shader));
+    if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+      console.error('Shader compile error:', gl.getShaderInfoLog(shader));
       gl.deleteShader(shader);
       return null;
     }
@@ -158,7 +158,7 @@
     gl.linkProgram(program);
 
     if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
-      console.error('Ошибка линковки:', gl.getProgramInfoLog(program));
+      console.error('Program link error:', gl.getProgramInfoLog(program));
       gl.deleteProgram(program);
       return null;
     }
@@ -166,27 +166,25 @@
   }
 
   var program = createProgram(gl, vertexShaderSource, fragmentShaderSource);
-  if (!program) return;
+  if (!program) {
+    console.error('shader.js: program creation failed');
+    return;
+  }
 
   gl.useProgram(program);
 
   var positionLocation = gl.getAttribLocation(program, 'aPosition');
   var positionBuffer = gl.createBuffer();
   gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
-
-  gl.bufferData(
-    gl.ARRAY_BUFFER,
-    new Float32Array([
-      -1, -1,
-       1, -1,
-      -1,  1,
-      -1,  1,
-       1, -1,
-       1,  1
-    ]),
-    gl.STATIC_DRAW
-  );
-
+  var vertices = new Float32Array([
+    -1.0, -1.0,
+     1.0, -1.0,
+    -1.0,  1.0,
+    -1.0,  1.0,
+     1.0, -1.0,
+     1.0,  1.0
+  ]);
+  gl.bufferData(gl.ARRAY_BUFFER, vertices, gl.STATIC_DRAW);
   gl.enableVertexAttribArray(positionLocation);
   gl.vertexAttribPointer(positionLocation, 2, gl.FLOAT, false, 0, 0);
 
@@ -200,15 +198,16 @@
   function render() {
     resizeCanvas();
 
-    var t = (performance.now() - startTime) / 1000;
+    var t = (performance.now() - startTime) / 1000.0;
     gl.uniform1f(iTimeLocation, t);
-    gl.uniform3f(iResolutionLocation, canvas.width, canvas.height, 1);
+    gl.uniform3f(iResolutionLocation, canvas.width, canvas.height, 1.0);
     gl.uniform1i(iFrameLocation, frame++);
 
     gl.drawArrays(gl.TRIANGLES, 0, 6);
     requestAnimationFrame(render);
   }
 
+  console.log('shader.js: starting render loop');
   render();
-})();
+});
 
