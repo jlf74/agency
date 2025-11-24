@@ -1,4 +1,4 @@
-// shader2.js
+// shader5.js
 
 document.addEventListener('DOMContentLoaded', function () {
   console.log('shader2.js: DOMContentLoaded');
@@ -10,6 +10,11 @@ document.addEventListener('DOMContentLoaded', function () {
     return;
   }
 
+  // Логируем потерю контекста (особенно актуально для мобилок)
+  canvas.addEventListener('webglcontextlost', function (e) {
+    console.warn('shader2.js: WebGL context LOST', e);
+  });
+
   var gl = canvas.getContext('webgl');
   console.log('shader2.js: gl =', gl);
   if (!gl) {
@@ -18,31 +23,25 @@ document.addEventListener('DOMContentLoaded', function () {
   }
 
   var isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
-  navigator.userAgent
-);
+    navigator.userAgent
+  );
 
-function resizeCanvas() {
-  var dpr = window.devicePixelRatio || 1;
+  function resizeCanvas() {
+    // УПРОЩАЕМ: без hiDPI, один логический пиксель = один физический
+    var dpr = 1.0;
 
-  // Ограничиваем плотность пикселей:
-  // на мобильных — поменьше, на десктопе — не выше 1.5
-  if (isMobile) {
-    dpr = Math.min(dpr, 0.75); // можно поставить 0.5, если всё ещё тяжело
-  } else {
-    dpr = Math.min(dpr, 1.5);
+    var displayWidth  = Math.round(canvas.clientWidth  * dpr);
+    var displayHeight = Math.round(canvas.clientHeight * dpr);
+
+    if (canvas.width !== displayWidth || canvas.height !== displayHeight) {
+      canvas.width = displayWidth;
+      canvas.height = displayHeight;
+      gl.viewport(0, 0, displayWidth, displayHeight);
+      console.log('shader2.js: resized to', displayWidth, displayHeight);
+    }
   }
 
-  var displayWidth  = Math.round(canvas.clientWidth  * dpr);
-  var displayHeight = Math.round(canvas.clientHeight * dpr);
-
-  if (canvas.width !== displayWidth || canvas.height !== displayHeight) {
-    canvas.width = displayWidth;
-    canvas.height = displayHeight;
-    gl.viewport(0, 0, displayWidth, displayHeight);
-  }
-}
-
-    window.addEventListener('resize', resizeCanvas);
+  window.addEventListener('resize', resizeCanvas);
   resizeCanvas();
 
   var vertexShaderSource = `
@@ -58,6 +57,7 @@ function resizeCanvas() {
     uniform vec3  iResolution;
     uniform float iTime;
     uniform int   iFrame;
+    uniform float uMaxIter; // максимум шагов реймарчинга
 
     // tanh-заменитель
     float myTanh(float x) {
@@ -76,7 +76,8 @@ function resizeCanvas() {
     {
       // нормализованные координаты
       vec2 uv = (2.0 * fragCoord - iResolution.xy) / iResolution.y;
-      uv.x=-uv.x;
+      // отражаем по горизонтали
+      uv.x = -uv.x;
 
       vec3 color = vec3(0.0);
 
@@ -109,14 +110,14 @@ function resizeCanvas() {
       // В WebGL1 нельзя использовать t в условии for, делаем break внутри
       for (int i = 0; i < 99; i++)
       {
+        // ограничиваем количество шагов через uniform uMaxIter
+        if (float(i) > uMaxIter) break;
         if (t > 1000.0) break;
 
         vec3 p = rd * t + ro;
         vec3 q = p;
 
-        // ВНУТРЕННИЙ ЦИКЛ ИСПРАВЛЕН:
-        // вместо for(float j = 0.01; j < 11.; j += j)
-        // делаем цикл по int, а j считаем внутри
+        // ВНУТРЕННИЙ ЦИКЛ: int-индекс, j считается от 0.01, *2 каждый шаг
         for (int k = 0; k < 12; k++) {
           float j = 0.01 * pow(2.0, float(k)); // 0.01, 0.02, 0.04, ...
           if (j > 11.0) break;
@@ -210,6 +211,11 @@ function resizeCanvas() {
   var iResolutionLocation = gl.getUniformLocation(program, 'iResolution');
   var iTimeLocation       = gl.getUniformLocation(program, 'iTime');
   var iFrameLocation      = gl.getUniformLocation(program, 'iFrame');
+  var uMaxIterLocation    = gl.getUniformLocation(program, 'uMaxIter');
+
+  // Лимит шагов: мобильным меньше, десктопу больше
+  var maxIterValue = isMobile ? 40.0 : 80.0;
+  gl.uniform1f(uMaxIterLocation, maxIterValue);
 
   var startTime = performance.now();
   var frame = 0;
