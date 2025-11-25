@@ -223,6 +223,7 @@ document.addEventListener('DOMContentLoaded', function () {
   function render() {
     resizeCanvas();
 
+    var speedBoost = 2.0
     var t = (performance.now() - startTime) / 1000.0;
     gl.uniform1f(iTimeLocation, t);
     gl.uniform3f(iResolutionLocation, canvas.width, canvas.height, 1.0);
